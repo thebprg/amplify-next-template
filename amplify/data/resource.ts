@@ -6,12 +6,13 @@ adding a new "isDone" field as a boolean. The authorization rule below
 specifies that any user authenticated via an API key can "create", "read",
 "update", and "delete" any "Todo" records.
 =========================================================================*/
+
 const schema = a.schema({
   Todo: a
     .model({
-      content: a.string(),
+      content: a.string()
     })
-    .authorization((allow) => [allow.publicApiKey()]),
+    .authorization(allow => [allow.owner(), allow.publicApiKey().to(['read'])])
 });
 
 export type Schema = ClientSchema<typeof schema>;
@@ -19,13 +20,13 @@ export type Schema = ClientSchema<typeof schema>;
 export const data = defineData({
   schema,
   authorizationModes: {
-    defaultAuthorizationMode: "apiKey",
+    defaultAuthorizationMode: 'apiKey',
+    // API Key is used for allow.publicApiKey() rules
     apiKeyAuthorizationMode: {
-      expiresInDays: 30,
-    },
-  },
+      expiresInDays: 30
+    }
+  }
 });
-
 /*== STEP 2 ===============================================================
 Go to your frontend source code. From your client-side code, generate a
 Data client to make CRUDL requests to your table. (THIS SNIPPET WILL ONLY
