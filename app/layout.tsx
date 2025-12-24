@@ -2,8 +2,7 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./app.css";
 
-
-import AuthenticatorWrapper from "./AuthenticatorWrapper";
+import AuthProvider from "./components/AuthProvider";
 import "@aws-amplify/ui-react/styles.css";
 
 const inter = Inter({ subsets: ["latin"] });
@@ -20,10 +19,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body>      
-        <AuthenticatorWrapper>
+      <body> 
+        <AuthProvider>     
           {children}
-        </AuthenticatorWrapper>
+        </AuthProvider>
       </body>
     </html>
   );

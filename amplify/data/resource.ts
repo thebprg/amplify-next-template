@@ -8,11 +8,15 @@ specifies that any user authenticated via an API key can "create", "read",
 =========================================================================*/
 
 const schema = a.schema({
-  Todo: a
+  Url: a
     .model({
-      content: a.string()
+      originalUrl: a.string().required(),
+      shortCode: a.string().required(),
+      clicks: a.integer().default(0),
+      expiration: a.timestamp(),
     })
-    .authorization(allow => [allow.owner(), allow.publicApiKey().to(['read'])])
+    .secondaryIndexes((index) => [index("shortCode")])
+    .authorization(allow => [allow.owner(), allow.publicApiKey().to(['read', 'create', 'update'])])
 });
 
 export type Schema = ClientSchema<typeof schema>;
