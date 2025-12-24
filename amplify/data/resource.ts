@@ -7,6 +7,8 @@ specifies that any user authenticated via an API key can "create", "read",
 "update", and "delete" any "Todo" records.
 =========================================================================*/
 
+import { incrementClicks } from "../functions/increment-clicks/resource";
+
 const schema = a.schema({
   Url: a
     .model({
@@ -14,9 +16,29 @@ const schema = a.schema({
       shortCode: a.string().required(),
       clicks: a.integer().default(0),
       expiration: a.timestamp(),
+      description: a.string(),
+      
+      // Relationship
+      groupId: a.id(),
+      group: a.belongsTo('Group', 'groupId'),
     })
     .secondaryIndexes((index) => [index("shortCode")])
-    .authorization(allow => [allow.owner(), allow.publicApiKey().to(['read', 'create', 'update'])])
+    .authorization(allow => [allow.owner(), allow.publicApiKey().to(['read', 'create'])]),
+
+  Group: a
+    .model({
+      name: a.string().required(),
+      description: a.string(),
+      urls: a.hasMany('Url', 'groupId'),
+    })
+    .authorization(allow => [allow.owner()]),
+
+  incrementClicks: a
+    .mutation()
+    .arguments({ urlId: a.id() })
+    .returns(a.integer())
+    .handler(a.handler.function(incrementClicks))
+    .authorization(allow => [allow.publicApiKey()]),
 });
 
 export type Schema = ClientSchema<typeof schema>;

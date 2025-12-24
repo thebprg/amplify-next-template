@@ -13,36 +13,75 @@ import "./../app/app.css";
 import { generateShortCode } from "./utils";
 import Toast, { ToastType } from "./components/Toast";
 import Sidebar from "./components/Sidebar";
+import GuestNavbar from "./components/GuestNavbar";
+import ResumeModal from "./components/ResumeModal";
 import { validateUrl } from "./actions";
 
 Amplify.configure(outputs);
 
 const client = generateClient<Schema>();
+const authClient = generateClient<Schema>({ authMode: 'userPool' });
+
+const ITEMS_PER_PAGE = 10;
 
 export default function App() {
   const { user } = useAuthenticator((context) => [context.user]);
   const [urls, setUrls] = useState<Array<Schema["Url"]["type"]>>([]);
+  const [groups, setGroups] = useState<Array<Schema["Group"]["type"]>>([]);
+  
+  // Link Form State
   const [originalUrl, setOriginalUrl] = useState("");
   const [customAlias, setCustomAlias] = useState("");
+  const [description, setDescription] = useState("");
+  const [selectedGroupId, setSelectedGroupId] = useState("");
   const [expirationMonths, setExpirationMonths] = useState(3);
   
   const [shortenedUrl, setShortenedUrl] = useState<Schema["Url"]["type"] | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [toast, setToast] = useState<{ message: string, type: ToastType } | null>(null);
   
-  // Sidebar state (open by default for auth users)
+  // Sidebar state
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+
+  // Dashboard State
+  const [activeTab, setActiveTab] = useState<'links' | 'groups'>('links');
+  const [viewingGroup, setViewingGroup] = useState<Schema["Group"]["type"] | null>(null);
+  const [newGroupName, setNewGroupName] = useState("");
+  const [newGroupDesc, setNewGroupDesc] = useState("");
+  const [creatingGroup, setCreatingGroup] = useState(false);
+
+  // Pagination State
+  const [linksPage, setLinksPage] = useState(1);
+  const [groupsPage, setGroupsPage] = useState(1);
 
   const domain = typeof window !== 'undefined' ? window.location.origin : '';
 
   useEffect(() => {
     if (user) {
-      const sub = client.models.Url.observeQuery().subscribe({
-        next: (data) => setUrls([...data.items]),
+      // Observer Links
+      const subLinks = client.models.Url.observeQuery().subscribe({
+        next: (data) => {
+            // Sort by createdAt desc
+            const sorted = [...data.items].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+            setUrls(sorted);
+        },
       });
-      return () => sub.unsubscribe();
+      
+      // Observer Groups
+      const subGroups = authClient.models.Group.observeQuery().subscribe({
+        next: (data) => {
+            const sorted = [...data.items].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+            setGroups(sorted);
+        },
+        error: (err) => console.error("Error fetching groups:", err)
+      });
+      return () => {
+        subLinks.unsubscribe();
+        subGroups.unsubscribe();
+      };
     } else {
       setUrls([]);
+      setGroups([]);
     }
   }, [user]);
 
@@ -74,7 +113,6 @@ export default function App() {
 
     try {
       setIsLoading(true);
-      // Valid reachability
       const { isValid, error } = await validateUrl(urlToShorten);
       if (!isValid) {
         showToast(error || "URL unreachable.", "error");
@@ -107,11 +145,15 @@ export default function App() {
         originalUrl: urlToShorten,
         shortCode: finalShortCode,
         clicks: 0,
-        expiration: expirationTimestamp
+        expiration: expirationTimestamp,
+        description: description.trim() || undefined,
+        groupId: selectedGroupId || undefined
       }, { authMode });
 
       setOriginalUrl("");
       setCustomAlias("");
+      setDescription("");
+      setSelectedGroupId("");
       setShortenedUrl(newUrl);
       showToast("Link Generated!", "success");
     } catch (e: any) {
@@ -119,6 +161,46 @@ export default function App() {
       showToast(`Error: ${e.message}`, "error");
     } finally {
       setIsLoading(false);
+    }
+  }
+
+  async function createGroup() {
+    if (!newGroupName.trim()) {
+        showToast("Group Name required", "error");
+        return;
+    }
+    setCreatingGroup(true);
+    try {
+        await authClient.models.Group.create({
+            name: newGroupName.trim(),
+            description: newGroupDesc.trim() || undefined
+        });
+        showToast("Group Created", "success");
+        setNewGroupName("");
+        setNewGroupDesc("");
+    } catch(e) {
+        console.error("Create Group Error:", e);
+        showToast("Failed to create group", "error");
+    } finally {
+        setCreatingGroup(false);
+    }
+  }
+
+  async function deleteGroup(group: Schema["Group"]["type"]) {
+    if (!confirm(`Delete group "${group.name}" and ALL its links? This cannot be undone.`)) return;
+    
+    try {
+        const { data: groupLinks } = await authClient.models.Url.list({
+            filter: { groupId: { eq: group.id } }
+        });
+        await Promise.all(groupLinks.map(link => client.models.Url.delete({ id: link.id }, { authMode: 'userPool' })));
+        await authClient.models.Group.delete({ id: group.id });
+        
+        showToast("Group and contents deleted", "success");
+        if (viewingGroup?.id === group.id) setViewingGroup(null);
+    } catch(e) {
+        console.error(e);
+        showToast("Error deleting group", "error");
     }
   }
 
@@ -140,21 +222,30 @@ export default function App() {
     }
   };
 
+  // Filter & Pagination Logic
+  const visibleUrls = viewingGroup 
+    ? urls.filter(u => u.groupId === viewingGroup.id) 
+    : urls.filter(u => activeTab === 'links'); 
+
+  // Reset page when tab changes
+  useEffect(() => { setLinksPage(1); }, [activeTab, viewingGroup]);
+
+  const totalLinkPages = Math.ceil(visibleUrls.length / ITEMS_PER_PAGE);
+  const currentLinks = visibleUrls.slice((linksPage - 1) * ITEMS_PER_PAGE, linksPage * ITEMS_PER_PAGE);
+
+  const totalGroupPages = Math.ceil(groups.length / ITEMS_PER_PAGE);
+  const currentGroups = groups.slice((groupsPage - 1) * ITEMS_PER_PAGE, groupsPage * ITEMS_PER_PAGE);
+
   return (
     <div className={`app-shell ${!user ? 'guest-mode' : ''} ${!isSidebarOpen ? 'sidebar-collapsed' : ''}`}>
+      <ResumeModal />
       <Sidebar isOpen={isSidebarOpen} onToggle={() => setIsSidebarOpen(!isSidebarOpen)} />
       <div className="content-area">
 
-        {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
-
         {/* Guest Header */}
-        {!user && (
-          <header style={{ width: '100%', maxWidth: '1100px', display: 'flex', justifyContent: 'flex-end', padding: '1rem 0' }}>
-            <Link href="/login" style={{ color: 'var(--color-teal-700)', fontWeight: 600, textDecoration: 'none' }}>
-              Admin Login &rarr;
-            </Link>
-          </header>
-        )}
+        {!user && <GuestNavbar />}
+        <div style={{ width: '100%', padding: user ? 0 : '2rem', display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1 }}>
+          {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
 
         <main className="main-card">
           {/* LEFT: Inputs */}
@@ -165,7 +256,7 @@ export default function App() {
             </p>
 
             {/* Destination URL */}
-            <div style={{ marginBottom: '2rem' }}>
+            <div style={{ marginBottom: '1.5rem' }}>
               <label className="label-text">Destination URL</label>
               <input 
                 className="input-base" 
@@ -175,6 +266,48 @@ export default function App() {
                 autoFocus
               />
             </div>
+
+            {/* Description & Group (New) */}
+            {user && (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '1.5rem' }}>
+                     <div>
+                        <label className="label-text">Description <span style={{fontWeight: 400, opacity: 0.7}}>(Optional)</span></label>
+                        <input 
+                            className="input-base"
+                            placeholder="e.g. Marketing Campaign"
+                            maxLength={75}
+                            value={description}
+                            onChange={(e) => setDescription(e.target.value)}
+                            style={{ height: '3.5rem' }}
+                        />
+                        <div style={{ textAlign: 'right', fontSize: '0.75rem', color: '#94a3b8', marginTop: '0.25rem' }}>
+                            {description.length}/75
+                        </div>
+                     </div>
+                     <div>
+                        <label className="label-text">Group</label>
+                         {groups.length > 0 ? (
+                             <select
+                                className="input-base"
+                                value={selectedGroupId}
+                                onChange={(e) => setSelectedGroupId(e.target.value)}
+                                style={{ height: '3.5rem' }}
+                             >
+                                <option value="">None</option>
+                                {groups.map(g => (
+                                    <option key={g.id} value={g.id}>{g.name}</option>
+                                ))}
+                             </select>
+                         ) : (
+                             <div style={{ padding: '0.875rem', fontSize: '0.9rem', color: '#64748b', background: '#f8fafc', borderRadius: '8px', border: '1px dashed #cbd5e1' }}>
+                                 <button onClick={() => { setActiveTab('groups'); document.getElementById('dashboard')?.scrollIntoView({ behavior: 'smooth' }); }} style={{ background: 'none', border: 'none', color: 'var(--color-teal-600)', fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }}>
+                                    Create a group first
+                                 </button>
+                             </div>
+                         )}
+                     </div>
+                </div>
+            )}
 
             {/* Row: Alias & Expiration */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '2.5rem' }}>
@@ -192,6 +325,12 @@ export default function App() {
                     onChange={(e) => setCustomAlias(e.target.value)}
                     disabled={!user}
                   />
+                  {!user && (
+                    <div 
+                        onClick={() => showToast("Login to get full access", "info")}
+                        style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', cursor: 'pointer' }}
+                    />
+                  )}
                 </div>
               </div>
               <div>
@@ -209,6 +348,12 @@ export default function App() {
                   <option value={6}>6 Months</option>
                   <option value={12}>1 Year</option>
                 </select>
+                 {!user && (
+                    <div 
+                        onClick={() => showToast("Login to get full access", "info")}
+                        style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', cursor: 'pointer' }}
+                    />
+                )}
               </div>
             </div>
 
@@ -313,160 +458,360 @@ export default function App() {
           </div>
         </main>
         
-        {/* Simple Dashboard List for Auth Users */}
-        {user && urls.length > 0 && (
+        {/* Dashboard Area */}
+        {user && (
           <section id="dashboard" style={{ marginTop: '4rem', width: '100%', maxWidth: '1100px', paddingBottom: '4rem' }}>
-            <h2 className="heading-lg" style={{ fontSize: '1.5rem', marginBottom: '1.5rem' }}>Your Active Links</h2>
-            <div style={{ display: 'grid', gap: '1rem' }}>
-              {urls.map(url => (
-                <div key={url.id} style={{ 
-                  background: 'white', 
-                  padding: '1.5rem', 
-                  borderRadius: 'var(--radius-lg)', 
-                  boxShadow: 'var(--shadow-layered)',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '1rem'
-                }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
-                          <a href={`${domain}/${url.shortCode}`} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-teal-700)', fontWeight: 800, fontSize: '1.25rem', textDecoration: 'none' }}>
-                            /{url.shortCode}
-                          </a>
-                          <span style={{ fontSize: '0.8rem', color: '#64748b', background: '#f1f5f9', padding: '0.25rem 0.5rem', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                            <span>Created: {new Date(url.createdAt).toLocaleDateString()}</span>
-                            {url.expiration && (
-                                <>
-                                    <span style={{ color: '#cbd5e1' }}>|</span>
-                                    <span style={{ color: (url.expiration * 1000 < Date.now()) ? '#ef4444' : '#64748b' }}>
-                                        Expires: {new Date(url.expiration * 1000).toLocaleDateString()}
-                                    </span>
-                                </>
-                            )}
-                          </span>
-                      </div>
-                      
-                      {/* Editable Original URL */}
-                      <DashboardUrlItem url={url} client={client} showToast={showToast} />
-
-                    </div>
-                    
-                    <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center' }}>
-                       <div style={{ textAlign: 'center' }}>
-                         <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-slate-400)', textTransform: 'uppercase' }}>Clicks</div>
-                         <div style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--color-teal-900)' }}>{url.clicks}</div>
-                       </div>
-                       <span style={{ 
-                         padding: '0.25rem 0.75rem', 
-                         borderRadius: '99px', 
-                         background: (url.expiration && url.expiration * 1000 < Date.now()) ? '#fee2e2' : '#dcfce7',
-                         color: (url.expiration && url.expiration * 1000 < Date.now()) ? '#ef4444' : '#166534',
-                         fontWeight: 700,
-                         fontSize: '0.75rem'
-                       }}>
-                         {(url.expiration && url.expiration * 1000 < Date.now()) ? 'EXPIRED' : 'ACTIVE'}
-                       </span>
-                       
-                       <button 
-                          onClick={async () => {
-                              if (window.confirm("Delete this link?")) {
-                                  try {
-                                      await client.models.Url.delete({ id: url.id }, { authMode: 'userPool' });
-                                      showToast("Link deleted", "success");
-                                  } catch(e) {
-                                      console.error("Delete error", e);
-                                      showToast("Delete failed", "error");
-                                  }
-                              }
-                          }}
-                          style={{
-                              background: '#fef2f2',
-                              color: '#ef4444',
-                              border: '1px solid #fee2e2',
-                              borderRadius: '6px',
-                              padding: '0 0.75rem',
-                              height: '36px',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              cursor: 'pointer',
-                              fontSize: '1rem',
-                              transition: 'all 0.2s'
-                          }}
-                          title="Delete Link"
-                       >
-                           Delete
-                       </button>
-                    </div>
-                  </div>
-                </div>
-              ))}
+            
+            {/* Tabs */}
+            <div style={{ display: 'flex', gap: '2rem', marginBottom: '2rem', borderBottom: '1px solid #e2e8f0' }}>
+               <button 
+                  onClick={() => { setActiveTab('links'); setViewingGroup(null); }}
+                  style={{
+                      padding: '1rem 0',
+                      background: 'none',
+                      border: 'none',
+                      borderBottom: (activeTab === 'links' && !viewingGroup) ? '3px solid var(--color-teal-700)' : '3px solid transparent',
+                      color: (activeTab === 'links' && !viewingGroup) ? 'var(--color-teal-900)' : 'var(--color-slate-600)',
+                      fontWeight: (activeTab === 'links' && !viewingGroup) ? 800 : 500,
+                      fontSize: '1.25rem',
+                      cursor: 'pointer'
+                  }}
+               >
+                   All Links
+               </button>
+               <button 
+                  onClick={() => setActiveTab('groups')}
+                  style={{
+                      padding: '1rem 0',
+                      background: 'none',
+                      border: 'none',
+                      borderBottom: (activeTab === 'groups' || viewingGroup) ? '3px solid var(--color-teal-700)' : '3px solid transparent',
+                      color: (activeTab === 'groups' || viewingGroup) ? 'var(--color-teal-900)' : 'var(--color-slate-600)',
+                      fontWeight: (activeTab === 'groups' || viewingGroup) ? 800 : 500,
+                      fontSize: '1.25rem',
+                      cursor: 'pointer'
+                  }}
+               >
+                   Groups
+               </button>
             </div>
+
+            {/* Viewing Group Header */}
+            {viewingGroup && (
+                <div style={{ marginBottom: '2rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                    <button onClick={() => setViewingGroup(null)} style={{ background: '#f1f5f9', border: 'none', borderRadius: '50%', width: '36px', height: '36px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        &larr;
+                    </button>
+                    <div>
+                        <h2 style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--color-teal-900)' }}>{viewingGroup.name}</h2>
+                        {viewingGroup.description && <p style={{ color: 'var(--color-slate-600)' }}>{viewingGroup.description}</p>}
+                    </div>
+                </div>
+            )}
+
+            {/* GROUPS TAB CONTENT */}
+            {activeTab === 'groups' && !viewingGroup && (
+                <div style={{ display: 'grid', gap: '2rem' }}>
+                    {/* Create Group Form */}
+                    <div style={{ background: 'white', padding: '1.5rem', borderRadius: '16px', border: '1px solid #e2e8f0', display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'flex-start' }}>
+                        <div style={{ flex: 1, minWidth: '200px' }}>
+                            <input 
+                                className="input-base" 
+                                placeholder="New Group Name"
+                                value={newGroupName}
+                                onChange={(e) => setNewGroupName(e.target.value)}
+                            />
+                        </div>
+                        <div style={{ flex: 2, minWidth: '300px' }}>
+                             <input 
+                                className="input-base" 
+                                placeholder="Description (Optional, max 150 chars)"
+                                maxLength={150}
+                                value={newGroupDesc}
+                                onChange={(e) => setNewGroupDesc(e.target.value)}
+                            />
+                        </div>
+                        <button 
+                            className="btn-primary" 
+                            style={{ width: 'auto', padding: '0.875rem 1.5rem' }}
+                            onClick={createGroup}
+                            disabled={creatingGroup}
+                        >
+                            {creatingGroup ? 'Creating...' : 'Create Group'}
+                        </button>
+                    </div>
+
+                    {/* Group List */}
+                    {groups.length === 0 ? (
+                        <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--color-slate-400)' }}>No groups yet. Create one to organize your links!</div>
+                    ) : (
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1.5rem' }}>
+                            {currentGroups.map(group => (
+                                <div key={group.id} 
+                                    onClick={() => setViewingGroup(group)}
+                                    style={{ 
+                                        background: 'white', 
+                                        padding: '1.5rem', 
+                                        borderRadius: '16px', 
+                                        boxShadow: 'var(--shadow-layered)', 
+                                        cursor: 'pointer', 
+                                        transition: 'transform 0.2s',
+                                        border: '1px solid transparent'
+                                    }}
+                                    onMouseEnter={(e) => e.currentTarget.style.borderColor = 'var(--color-teal-500)'}
+                                    onMouseLeave={(e) => e.currentTarget.style.borderColor = 'transparent'}
+                                >
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
+                                        <h3 style={{ fontSize: '1.25rem', fontWeight: 700, margin: 0 }}>{group.name}</h3>
+                                        <button 
+                                            onClick={(e) => { e.stopPropagation(); deleteGroup(group); }}
+                                            style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '0.25rem' }}
+                                            title="Delete Group"
+                                        >
+                                            Delete
+                                        </button>
+                                    </div>
+                                    {group.description && <p style={{ color: 'var(--color-slate-600)', fontSize: '0.9rem', marginBottom: '1rem', minHeight: '1.5em' }}>{group.description}</p>}
+                                    <div style={{ color: 'var(--color-teal-700)', fontWeight: 600, fontSize: '0.875rem' }}>
+                                        View Links &rarr;
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                    {/* Groups Pagination */}
+                    {totalGroupPages > 1 && (
+                        <div style={{ display: 'flex', justifyContent: 'center', gap: '1rem', marginTop: '1rem', alignItems: 'center' }}>
+                            <button 
+                                disabled={groupsPage === 1}
+                                onClick={() => setGroupsPage(p => p - 1)}
+                                style={{ padding: '0.5rem 1rem', cursor: groupsPage === 1 ? 'default' : 'pointer', opacity: groupsPage === 1 ? 0.5 : 1 }}
+                            >
+                                Previous
+                            </button>
+                            <span>Page {groupsPage} of {totalGroupPages}</span>
+                            <button 
+                                disabled={groupsPage === totalGroupPages}
+                                onClick={() => setGroupsPage(p => p + 1)}
+                                style={{ padding: '0.5rem 1rem', cursor: groupsPage === totalGroupPages ? 'default' : 'pointer', opacity: groupsPage === totalGroupPages ? 0.5 : 1 }}
+                            >
+                                Next
+                            </button>
+                        </div>
+                    )}
+                </div>
+            )}
+
+
+            {/* LINKS LIST (Used by both All Links and Viewing Group) */}
+            {(activeTab === 'links' || viewingGroup) && (
+              <>
+                <div style={{ display: 'grid', gap: '1rem' }}>
+                {visibleUrls.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--color-slate-400)' }}>No links found.</div>
+                ) : currentLinks.map(url => (
+                    <LinkCard 
+                        key={url.id} 
+                        url={url} 
+                        group={groups.find(g => g.id === url.groupId)}
+                        domain={domain}
+                        client={client}
+                        showToast={showToast}
+                        onDelete={async (id) => {
+                             try {
+                                await client.models.Url.delete({ id }, { authMode: 'userPool' });
+                                showToast("Link deleted", "success");
+                            } catch(e) {
+                                console.error("Delete error", e);
+                                showToast("Delete failed", "error");
+                            }
+                        }}
+                    />
+                ))}
+                </div>
+                {/* Links Pagination */}
+                {totalLinkPages > 1 && (
+                    <div style={{ display: 'flex', justifyContent: 'center', gap: '1rem', marginTop: '2rem', alignItems: 'center' }}>
+                        <button 
+                            disabled={linksPage === 1}
+                            onClick={() => setLinksPage(p => p - 1)}
+                            style={{ padding: '0.5rem 1rem', cursor: linksPage === 1 ? 'default' : 'pointer', opacity: linksPage === 1 ? 0.5 : 1 }}
+                        >
+                            Previous
+                        </button>
+                        <span>Page {linksPage} of {totalLinkPages}</span>
+                        <button 
+                            disabled={linksPage === totalLinkPages}
+                            onClick={() => setLinksPage(p => p + 1)}
+                            style={{ padding: '0.5rem 1rem', cursor: linksPage === totalLinkPages ? 'default' : 'pointer', opacity: linksPage === totalLinkPages ? 0.5 : 1 }}
+                        >
+                            Next
+                        </button>
+                    </div>
+                )}
+              </>
+            )}
           </section>
         )}
+        </div>
       </div>
     </div>
   );
 }
 
-// Sub-component for editable URL item
-function DashboardUrlItem({ url, client, showToast }: { url: any, client: any, showToast: any }) {
+
+
+function LinkCard({ url, group, domain, client, showToast, onDelete }: { 
+    url: any, 
+    group?: any, 
+    domain: string, 
+    client: any, 
+    showToast: (m: string, t: ToastType) => void,
+    onDelete: (id: string) => void
+}) {
+    const [isQrOpen, setIsQrOpen] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
     const [editValue, setEditValue] = useState(url.originalUrl);
-    const [saving, setSaving] = useState(false);
 
-    async function handleSave() {
-        if (!editValue.trim()) return;
-        setSaving(true);
+    // Helpers
+    const isExpired = url.expiration && url.expiration * 1000 < Date.now();
+    const fullShortLink = `${domain}/${url.shortCode}`;
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${fullShortLink}`;
+
+    const handleCopy = () => {
+        navigator.clipboard.writeText(fullShortLink);
+        showToast("Copied!", "success");
+    };
+
+    const handleSaveOriginal = async () => {
+        if(!editValue.trim()) return;
         try {
-            await client.models.Url.update({
-                id: url.id,
-                originalUrl: editValue.trim()
-            }, { authMode: 'userPool' });
-            showToast("URL updated", "success");
+            await client.models.Url.update({ id: url.id, originalUrl: editValue.trim() }, { authMode: 'userPool' });
+            showToast("Updated Destination", "success");
             setIsEditing(false);
         } catch(e) {
-            console.error("Update error", e);
             showToast("Update failed", "error");
-        } finally {
-            setSaving(false);
         }
-    }
-
-    if (isEditing) {
-        return (
-            <div style={{ marginTop: '0.5rem', display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                <input 
-                    className="input-base"
-                    value={editValue}
-                    onChange={(e) => setEditValue(e.target.value)}
-                    style={{ padding: '0.5rem', fontSize: '0.9rem', flex: 1, maxWidth: '400px' }}
-                    autoFocus
-                />
-                <button onClick={handleSave} disabled={saving} style={{ background: '#0f766e', color: 'white', border: 'none', padding: '0.5rem 1rem', borderRadius: '6px', cursor: 'pointer', fontSize: '0.85rem' }}>
-                    {saving ? '...' : 'Save'}
-                </button>
-                <button onClick={() => setIsEditing(false)} style={{ background: '#e2e8f0', color: '#475569', border: 'none', padding: '0.5rem 1rem', borderRadius: '6px', cursor: 'pointer', fontSize: '0.85rem' }}>
-                    Cancel
-                </button>
-            </div>
-        )
-    }
+    };
 
     return (
-        <div style={{ color: 'var(--color-slate-400)', fontSize: '0.9rem', marginTop: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <span style={{ maxWidth: '400px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {url.originalUrl}
-            </span>
-            <button 
-                onClick={() => setIsEditing(true)}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.85rem', color: 'var(--color-teal-600)', fontWeight: 600, textDecoration: 'underline' }}
-                title="Edit Destination"
-            >
-                Edit
-            </button>
+        <div style={{ background: 'white', borderRadius: '12px', padding: '1.25rem', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', border: '1px solid #f1f5f9' }}>
+            
+            <div style={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
+                
+                {/* --- LEFT SECTION: Links --- */}
+                <div style={{ flex: '1 1 300px', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                    
+                    {/* Short Link */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                         <a href={fullShortLink} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-teal-700)', fontWeight: 800, fontSize: '1.2rem', textDecoration: 'none', lineHeight: 1 }}>
+                            {fullShortLink.replace(/^https?:\/\//, '')}
+                        </a>
+                        <button 
+                            onClick={handleCopy}
+                            style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '6px', padding: '2px 8px', fontSize: '0.7rem', cursor: 'pointer', fontWeight: 600, color: '#475569', height: 'fit-content' }}
+                        >
+                            Copy
+                        </button>
+                    </div>
+
+                    {/* Original URL */}
+                    <div style={{ fontSize: '0.8rem', color: '#64748b' }}>
+                        {isEditing ? (
+                            <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.25rem' }}>
+                                <input value={editValue} onChange={e => setEditValue(e.target.value)} className="input-base" style={{ padding: '4px 8px', fontSize: '0.8rem', width: '100%' }} />
+                                <button onClick={handleSaveOriginal} style={{ color: 'white', background: '#0f766e', border: 'none', borderRadius: '4px', padding: '0 8px', cursor: 'pointer' }}>Save</button>
+                                <button onClick={() => setIsEditing(false)} style={{ background: '#e2e8f0', border: 'none', borderRadius: '4px', padding: '0 8px', cursor: 'pointer' }}>X</button>
+                            </div>
+                        ) : (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                 <span style={{ maxWidth: '300px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: 1.2 }} title={url.originalUrl}>
+                                    {url.originalUrl}
+                                 </span>
+                                 <button onClick={() => setIsEditing(true)} style={{ background: 'none', border: 'none', color: 'var(--color-teal-600)', cursor: 'pointer', textDecoration: 'underline', fontSize: '0.75rem' }}>Edit</button>
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                {/* --- MIDDLE SECTION: Meta (Group, Desc, Dates) --- */}
+                <div style={{ flex: '1 1 250px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '0.35rem', borderLeft: '1px solid #f1f5f9', borderRight: '1px solid #f1f5f9', padding: '0 1rem' }}>
+                    
+                    {/* Top: Dates */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', fontSize: '0.75rem', color: '#94a3b8' }}>
+                        <span title={new Date(url.createdAt).toLocaleString()}>
+                            Created: {new Date(url.createdAt).toLocaleDateString()}
+                        </span>
+                        {url.expiration && (
+                            <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: isExpired ? '#ef4444' : '#94a3b8' }}>
+                                {isExpired && <span>⚠️</span>}
+                                Expires: {new Date(url.expiration * 1000).toLocaleDateString()}
+                            </span>
+                        )}
+                    </div>
+
+                    {/* Bottom: Group & Description */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap', justifyContent: 'center' }}>
+                        {group && (
+                            <span style={{ background: '#ccfbf1', color: '#115e59', padding: '2px 8px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase' }}>
+                                {group.name}
+                            </span>
+                        )}
+                        {url.description && (
+                            <span style={{ fontSize: '0.9rem', color: '#334155', fontWeight: 500 }}>
+                                {url.description}
+                            </span>
+                        )}
+                    </div>
+
+                </div>
+
+                {/* --- RIGHT SECTION: Actions --- */}
+                <div style={{ flex: '0 0 auto', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.75rem' }}>
+                    
+                    {/* Stats */}
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+                         <span style={{ fontSize: '0.65rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Clicks</span>
+                         <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#0f766e' }}>{url.clicks}</div>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                         <button 
+                            onClick={() => setIsQrOpen(!isQrOpen)}
+                            style={{ background: isQrOpen ? '#f0fdfa' : 'white', border: '1px solid #ccfbf1', color: '#0f766e', borderRadius: '6px', padding: '6px 10px', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}
+                        >
+                             {isQrOpen ? 'Hide QR' : 'Show QR'}
+                        </button>
+                        
+                        <button 
+                            onClick={() => onDelete(url.id)}
+                            style={{ background: '#fff1f2', border: '1px solid #ffe4e6', color: '#e11d48', borderRadius: '6px', padding: '6px 10px', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}
+                        >
+                            Delete
+                        </button>
+                    </div>
+
+                </div>
+
+            </div>
+            
+            {/* Expanded QR */}
+            {isQrOpen && (
+                <div style={{ marginTop: '1rem', padding: '1rem', background: '#f8fafc', borderRadius: '8px', display: 'flex', gap: '1.5rem', alignItems: 'center', justifyContent: 'center', border: '1px solid #e2e8f0' }}>
+                    <div style={{ width: '150px', height: '150px', background: 'white', padding: '8px', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
+                        <img src={qrUrl} alt="QR" style={{ width: '100%', height: '100%' }} />
+                    </div>
+                    <div>
+                         <h4 style={{ fontSize: '0.9rem', fontWeight: 700, color: '#334155', margin: '0 0 0.5rem 0' }}>QR Code</h4>
+                         <div style={{ fontSize: '0.8rem', color: '#64748b', marginBottom: '0.5rem' }}>
+                            Scan to visit <br/> <strong>{fullShortLink.replace(/^https?:\/\//, '')}</strong>
+                         </div>
+                         <a href={qrUrl} download={`qr-${url.shortCode}.png`} target="_blank" rel="noreferrer" style={{ display: 'inline-block', background: '#0f766e', color: 'white', padding: '6px 12px', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 600, textDecoration: 'none' }}>
+                             Download PNG
+                         </a>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
-
