@@ -42,10 +42,20 @@ export default async function ShortUrlRedirect({ params }: { params: { shortCode
       // In server components, we must await side effects or offload them.
       // Increment Clicks (Fire and forget, but await to ensure it runs before redirect kills context if needed)
       // In server components, we must await side effects or offload them.
+      // Increment Clicks (Fire and forget, but await to ensure it runs before redirect kills context if needed)
+      // In server components, we must await side effects or offload them.
       try {
-         await client.mutations.incrementClicks({
-            urlId: url.id
-         }, { authMode: 'apiKey' });
+         const mutation = `
+            mutation IncrementClicks($urlId: ID!) {
+              incrementClicks(urlId: $urlId)
+            }
+         `;
+         // @ts-ignore - graphql is available on the client but types might be strict
+         await client.graphql({
+            query: mutation,
+            variables: { urlId: url.id },
+            authMode: 'apiKey'
+         });
       } catch (e) {
          // Silently fail click tracking if public auth has issues, don't block redirect
          console.warn("Click tracking failed", e);
