@@ -1,14 +1,14 @@
-import type { Schema } from "../../data/resource";
 import { DynamoDBClient, UpdateItemCommand } from "@aws-sdk/client-dynamodb";
 
 const client = new DynamoDBClient({});
 
-export const handler: Schema["incrementClicks"]["functionHandler"] = async (event) => {
+export const handler = async (event: { arguments: { urlId: string } }) => {
   const { urlId } = event.arguments;
   const tableName = process.env.URL_TABLE_NAME;
 
   if (!tableName) throw new Error("URL_TABLE_NAME missing");
   if (!urlId) throw new Error("URL ID missing");
+
 
   try {
     await client.send(new UpdateItemCommand({
