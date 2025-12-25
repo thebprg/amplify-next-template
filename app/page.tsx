@@ -67,7 +67,7 @@ export default function App() {
   useEffect(() => {
     if (user) {
       // Observer Links
-      const subLinks = client.models.Url.observeQuery().subscribe({
+      const subLinks = client.models.Url.observeQuery({ authMode: 'userPool' }).subscribe({
         next: (data) => {
             // Sort by createdAt desc
             const sorted = [...data.items].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
@@ -76,7 +76,7 @@ export default function App() {
       });
       
       // Observer Groups
-      const subGroups = authClient.models.Group.observeQuery().subscribe({
+      const subGroups = authClient.models.Group.observeQuery({ authMode: 'userPool' }).subscribe({
         next: (data) => {
             const sorted = [...data.items].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
             setGroups(sorted);
@@ -627,12 +627,18 @@ export default function App() {
                         client={client}
                         showToast={showToast}
                         onDelete={async (id) => {
+                             // Optimistic update
+                             const previousUrls = [...urls];
+                             setUrls(prev => prev.filter(u => u.id !== id));
+
                              try {
                                 await client.models.Url.delete({ id }, { authMode: 'userPool' });
                                 showToast("Link deleted", "success");
                             } catch(e) {
                                 console.error("Delete error", e);
                                 showToast("Delete failed", "error");
+                                // Revert on failure
+                                setUrls(previousUrls);
                             }
                         }}
                     />

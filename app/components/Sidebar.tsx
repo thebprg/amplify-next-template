@@ -23,14 +23,14 @@ export default function Sidebar({ isOpen, onToggle }: { isOpen: boolean; onToggl
               width: '44px',
               height: '44px',
               borderRadius: '12px',
-              background: 'var(--color-teal-900)',
-              color: 'white',
+              background: 'transparent',
+              color: isOpen ? 'white' : 'var(--color-teal-900)',
               border: 'none',
-              boxShadow: '0 4px 12px rgba(15, 118, 110, 0.3)',
+              boxShadow: 'none',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              fontSize: '1.25rem',
+              fontSize: '2rem', /* Increased size since box is gone */
               cursor: 'pointer',
               transition: 'all 0.3s ease'
           }}

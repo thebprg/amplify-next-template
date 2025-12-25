@@ -106,7 +106,7 @@ h1, h2, h3, h4, button, input, label {
 /* Content Area */
 .content-area {
   flex: 1;
-  padding: 2rem;
+  padding: 5rem 2rem 2rem 2rem; /* Increased top padding to clear fixed header/button */
   margin-left: 260px; 
   transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   display: flex;
@@ -130,16 +130,16 @@ h1, h2, h3, h4, button, input, label {
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow-layered);
   width: 100%;
-  max-width: 1600px; /* Increased from 1000px to cover more room */
+  max-width: 1250px; /* Reduced from 1600px as requested "reduce a little" */
   display: flex;
   overflow: hidden;
-  margin-top: 1rem;
+  margin-top: 0;
   border: 1px solid rgba(0,0,0,0.05);
   align-items: stretch; /* Ensure equal height */
 }
 
 .card-section {
-  padding: 3rem; /* Comfortable padding */
+  padding: 2.5rem; /* Slightly reduced padding */
 }
 
 .card-left {
@@ -278,6 +278,7 @@ h1, h2, h3, h4, button, input, label {
 @media (max-width: 768px) {
   .content-area {
     margin-left: 0 !important;
+    padding-top: 7.5rem; /* Increased significantly to absolutely clear the fixed button */
   }
 }
 
@@ -420,4 +421,52 @@ h1, h2, h3, h4, button, input, label {
       /* Clicks */
       align-items: flex-start !important;
   }
+}
+
+/* --- Login / Authenticator Customization --- */
+
+.auth-card {
+  background: white;
+  border-radius: 24px;
+  box-shadow: 
+    0 4px 6px -1px rgba(0, 0, 0, 0.1), 
+    0 2px 4px -1px rgba(0, 0, 0, 0.06),
+    0 20px 25px -5px rgba(0, 0, 0, 0.05); /* Deep shadow */
+  border: 1px solid rgba(0,0,0,0.05);
+  width: 100%;
+  max-width: 560px;
+  overflow: hidden;
+}
+
+/* Override Amplify CSS Variables */
+[data-amplify-authenticator] {
+  --amplify-colors-background-primary: transparent;
+  --amplify-colors-brand-primary-10: var(--color-cyan-100);
+  --amplify-colors-brand-primary-80: var(--color-teal-700);
+  --amplify-colors-brand-primary-90: var(--color-teal-800);
+  --amplify-colors-brand-primary-100: var(--color-teal-900);
+  
+  --amplify-components-button-primary-background-color: var(--color-teal-700);
+  --amplify-components-button-primary-hover-background-color: var(--color-teal-800);
+  --amplify-components-button-primary-box-shadow: 0 4px 6px rgba(15, 118, 110, 0.2);
+  --amplify-components-button-border-radius: 12px;
+  
+  --amplify-components-fieldcontrol-border-radius: 12px;
+  --amplify-components-fieldcontrol-focus-box-shadow: 0 0 0 3px var(--color-cyan-100);
+  
+  --amplify-components-tabs-item-active-color: var(--color-teal-700);
+  --amplify-components-tabs-item-active-border-color: var(--color-teal-700);
+  
+  --amplify-fonts-default: 'Inter', system-ui, sans-serif;
+}
+
+/* Remove default Amplify Card shadows/borders to blend with Auth Card */
+[data-amplify-authenticator] [data-amplify-router] {
+  box-shadow: none;
+  border: none;
+  background: transparent;
+}
+
+[data-amplify-authenticator] [data-amplify-footer] {
+    display: none; 
 }

@@ -32,7 +32,7 @@ export default function LoginPage() {
         minHeight: 'calc(100vh - 140px)', // Adjusted height
         padding: '2rem'
       }}>
-        <div className="glass-card" style={{ padding: '2rem' }}>
+        <div className="auth-card" style={{ padding: '2rem' }}>
         <h2 style={{ 
           marginBottom: '2rem', 
           textAlign: 'center', 
