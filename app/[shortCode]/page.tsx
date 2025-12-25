@@ -50,12 +50,11 @@ export default async function ShortUrlRedirect({ params }: { params: { shortCode
               incrementClicks(urlId: $urlId)
             }
          `;
-         // @ts-ignore - graphql is available on the client but types might be strict
          await client.graphql({
             query: mutation,
             variables: { urlId: url.id },
             authMode: 'apiKey'
-         });
+         } as any);
       } catch (e) {
          // Silently fail click tracking if public auth has issues, don't block redirect
          console.warn("Click tracking failed", e);

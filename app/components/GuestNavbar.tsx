@@ -22,9 +22,7 @@ export default function GuestNavbar() {
     }}>
       {/* LEFT: Branding & Nav Links */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '2.5rem' }}>
-        <Link href="/" style={{ textDecoration: 'none', fontSize: '1.25rem', fontWeight: 800, color: 'var(--color-teal-900)' }}>
-            Qupeg
-        </Link>
+
         
         <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center' }}>
             <Link href="/about" style={{ textDecoration: 'none', color: 'var(--color-slate-600)', fontWeight: 500, fontSize: '0.95rem' }}>

@@ -5,9 +5,10 @@ import { generateClient } from "aws-amplify/data";
 import type { Schema } from "@/amplify/data/resource";
 import { Amplify } from "aws-amplify";
 import outputs from "@/amplify_outputs.json";
-import "@aws-amplify/ui-react/styles.css";
+
 import { useAuthenticator } from "@aws-amplify/ui-react";
 import Link from 'next/link';
+import QRCode from 'qrcode';
 
 import "./../app/app.css";
 import { generateShortCode } from "./utils";
@@ -89,6 +90,11 @@ export default function App() {
     } else {
       setUrls([]);
       setGroups([]);
+      setShortenedUrl(null);
+      setOriginalUrl("");
+      setCustomAlias("");
+      setDescription("");
+      setSelectedGroupId("");
     }
   }, [user]);
 
@@ -213,19 +219,18 @@ export default function App() {
 
   const downloadQr = async () => {
     if (!shortenedUrl) return;
-    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${domain}/${shortenedUrl.shortCode}`;
+    const fullShortLink = `${domain}/${shortenedUrl.shortCode}`;
     try {
-      const resp = await fetch(qrUrl);
-      const blob = await resp.blob();
-      const url = window.URL.createObjectURL(blob);
+      const dataUrl = await QRCode.toDataURL(fullShortLink, { width: 300, margin: 2 });
       const a = document.createElement('a');
-      a.href = url;
+      a.href = dataUrl;
       a.download = `qrcode-${shortenedUrl.shortCode}.png`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
     } catch (e) {
-      window.open(qrUrl, '_blank');
+      console.error(e);
+      showToast("Error generating QR", "error");
     }
   };
 
@@ -432,11 +437,7 @@ export default function App() {
                         }}>
                             {/* Placeholder / Actual QR */}
                             {shortenedUrl ? (
-                                <img 
-                                    src={`https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${domain.replace('http://', 'https://')}/${shortenedUrl.shortCode}`} 
-                                    alt="QR Code" 
-                                    style={{ width: '100%', height: '100%', objectFit: 'contain' }} 
-                                />
+                                <QrDisplay url={`${domain.replace('http://', 'https://')}/${shortenedUrl.shortCode}`} />
                             ) : (
                                 <div style={{ width: '100%', height: '100%', background: '#f1f5f9', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                     <span style={{ fontSize: '1.2rem', color: '#94a3b8', fontWeight: 600 }}>QR Preview</span>
@@ -684,7 +685,6 @@ function LinkCard({ url, group, domain, client, showToast, onDelete }: {
     // Helpers
     const isExpired = url.expiration && url.expiration * 1000 < Date.now();
     const fullShortLink = `${domain}/${url.shortCode}`;
-    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${fullShortLink}`;
 
     const handleCopy = () => {
         navigator.clipboard.writeText(fullShortLink);
@@ -703,16 +703,16 @@ function LinkCard({ url, group, domain, client, showToast, onDelete }: {
     };
 
     return (
-        <div style={{ background: 'white', borderRadius: '12px', padding: '1.25rem', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', border: '1px solid #f1f5f9' }}>
+        <div className="link-card">
             
-            <div style={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
+            <div className="link-card-inner">
                 
                 {/* --- LEFT SECTION: Links --- */}
-                <div style={{ flex: '1 1 300px', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                <div className="lc-section-left">
                     
                     {/* Short Link */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                         <a href={fullShortLink} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-teal-700)', fontWeight: 800, fontSize: '1.2rem', textDecoration: 'none', lineHeight: 1 }}>
+                         <a href={fullShortLink} target="_blank" rel="noopener noreferrer" className="lc-short-link">
                             {fullShortLink.replace(/^https?:\/\//, '')}
                         </a>
                         <button 
@@ -724,7 +724,7 @@ function LinkCard({ url, group, domain, client, showToast, onDelete }: {
                     </div>
 
                     {/* Original URL */}
-                    <div style={{ fontSize: '0.8rem', color: '#64748b' }}>
+                    <div className="lc-original-url">
                         {isEditing ? (
                             <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.25rem' }}>
                                 <input value={editValue} onChange={e => setEditValue(e.target.value)} className="input-base" style={{ padding: '4px 8px', fontSize: '0.8rem', width: '100%' }} />
@@ -743,10 +743,10 @@ function LinkCard({ url, group, domain, client, showToast, onDelete }: {
                 </div>
 
                 {/* --- MIDDLE SECTION: Meta (Group, Desc, Dates) --- */}
-                <div style={{ flex: '1 1 250px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '0.35rem', borderLeft: '1px solid #f1f5f9', borderRight: '1px solid #f1f5f9', padding: '0 1rem' }}>
+                <div className="lc-section-middle">
                     
                     {/* Top: Dates */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', fontSize: '0.75rem', color: '#94a3b8' }}>
+                    <div className="lc-meta-date">
                         <span title={new Date(url.createdAt).toLocaleString()}>
                             Created: {new Date(url.createdAt).toLocaleDateString()}
                         </span>
@@ -759,9 +759,9 @@ function LinkCard({ url, group, domain, client, showToast, onDelete }: {
                     </div>
 
                     {/* Bottom: Group & Description */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap', justifyContent: 'center' }}>
+                    <div className="lc-meta-group">
                         {group && (
-                            <span style={{ background: '#ccfbf1', color: '#115e59', padding: '2px 8px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase' }}>
+                            <span className="lc-group-tag">
                                 {group.name}
                             </span>
                         )}
@@ -775,12 +775,12 @@ function LinkCard({ url, group, domain, client, showToast, onDelete }: {
                 </div>
 
                 {/* --- RIGHT SECTION: Actions --- */}
-                <div style={{ flex: '0 0 auto', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.75rem' }}>
+                <div className="lc-section-right">
                     
                     {/* Stats */}
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-                         <span style={{ fontSize: '0.65rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Clicks</span>
-                         <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#0f766e' }}>{url.clicks}</div>
+                         <span className="lc-clicks-label">Clicks</span>
+                         <div className="lc-clicks-value">{url.clicks}</div>
                     </div>
 
                     <div style={{ display: 'flex', gap: '0.5rem' }}>
@@ -807,19 +807,50 @@ function LinkCard({ url, group, domain, client, showToast, onDelete }: {
             {isQrOpen && (
                 <div style={{ marginTop: '1rem', padding: '1rem', background: '#f8fafc', borderRadius: '8px', display: 'flex', gap: '1.5rem', alignItems: 'center', justifyContent: 'center', border: '1px solid #e2e8f0' }}>
                     <div style={{ width: '150px', height: '150px', background: 'white', padding: '8px', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
-                        <img src={qrUrl} alt="QR" style={{ width: '100%', height: '100%' }} />
+                        <QrDisplay url={fullShortLink} />
                     </div>
                     <div>
                          <h4 style={{ fontSize: '0.9rem', fontWeight: 700, color: '#334155', margin: '0 0 0.5rem 0' }}>QR Code</h4>
                          <div style={{ fontSize: '0.8rem', color: '#64748b', marginBottom: '0.5rem' }}>
                             Scan to visit <br/> <strong>{fullShortLink.replace(/^https?:\/\//, '')}</strong>
                          </div>
-                         <a href={qrUrl} download={`qr-${url.shortCode}.png`} target="_blank" rel="noreferrer" style={{ display: 'inline-block', background: '#0f766e', color: 'white', padding: '6px 12px', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 600, textDecoration: 'none' }}>
-                             Download PNG
-                         </a>
+                         <DownloadQrBtn url={fullShortLink} filename={`qr-${url.shortCode}.png`} />
                     </div>
                 </div>
             )}
         </div>
+    );
+}
+
+function QrDisplay({ url }: { url: string }) {
+    const [src, setSrc] = useState<string>('');
+    
+    useEffect(() => {
+        QRCode.toDataURL(url, { width: 400, margin: 2 })
+            .then(setSrc)
+            .catch(err => console.error("QR Gen Error", err));
+    }, [url]);
+
+    if (!src) return <div style={{ color: '#94a3b8' }}>Generating...</div>;
+
+    return <img src={src} alt="QR Code" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />;
+}
+
+function DownloadQrBtn({ url, filename }: { url: string, filename: string }) {
+    const download = async () => {
+        try {
+            const dataUrl = await QRCode.toDataURL(url, { width: 300, margin: 2 });
+            const a = document.createElement('a');
+            a.href = dataUrl;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        } catch(e) { console.error(e); }
+    };
+    return (
+        <button onClick={download} style={{ display: 'inline-block', background: '#0f766e', color: 'white', padding: '6px 12px', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 600, border: 'none', cursor: 'pointer' }}>
+             Download PNG
+        </button>
     );
 }
