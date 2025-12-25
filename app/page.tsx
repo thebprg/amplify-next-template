@@ -43,6 +43,13 @@ export default function App() {
   // Sidebar state
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
+  useEffect(() => {
+    // Auto-close on mobile
+    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+      setIsSidebarOpen(false);
+    }
+  }, []);
+
   // Dashboard State
   const [activeTab, setActiveTab] = useState<'links' | 'groups'>('links');
   const [viewingGroup, setViewingGroup] = useState<Schema["Group"]["type"] | null>(null);
@@ -264,6 +271,7 @@ export default function App() {
                 value={originalUrl}
                 onChange={(e) => setOriginalUrl(e.target.value)}
                 autoFocus
+                style={{ position: 'relative', zIndex: 1 }}
               />
             </div>
 
@@ -333,7 +341,7 @@ export default function App() {
                   )}
                 </div>
               </div>
-              <div>
+              <div style={{ position: 'relative' }}>
                 <label className="label-text">
                   Expiration {!user && "(Default)"}
                 </label>

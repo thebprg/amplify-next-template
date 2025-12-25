@@ -43,8 +43,7 @@ export default function Sidebar({ isOpen, onToggle }: { isOpen: boolean; onToggl
       {/* Sliding Sidebar Panel */}
       <aside className={`sidebar-panel ${isOpen ? 'open' : 'closed'}`}>
         <div style={{ marginTop: '4rem', marginBottom: '2rem', display: 'flex', alignItems: 'center', gap: '0.5rem', paddingLeft: '0.5rem' }}>
-          <span style={{ fontSize: '1.5rem' }}>⚡️</span>
-          <span style={{ fontSize: '1.5rem', fontWeight: 800, letterSpacing: '-0.03em', color: 'white' }}>QuickLink</span>
+          <span style={{ fontSize: '1.5rem', fontWeight: 800, letterSpacing: '-0.03em', color: 'white' }}>Products</span>
         </div>
 
         <nav style={{ flex: 1 }}>

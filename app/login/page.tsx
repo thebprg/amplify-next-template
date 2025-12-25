@@ -18,16 +18,21 @@ function LoginRedirect() {
   return null;
 }
 
+import GuestNavbar from "../components/GuestNavbar";
+
+// ... inside function
 export default function LoginPage() {
   return (
-    <div style={{ 
-      display: 'flex', 
-      justifyContent: 'center', 
-      alignItems: 'center', 
-      minHeight: 'calc(100vh - 80px)', // Account for navbar
-      padding: '2rem'
-    }}>
-      <div className="glass-card" style={{ padding: '2rem', background: 'white' }}>
+    <>
+      <GuestNavbar />
+      <div style={{ 
+        display: 'flex', 
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        minHeight: 'calc(100vh - 140px)', // Adjusted height
+        padding: '2rem'
+      }}>
+        <div className="glass-card" style={{ padding: '2rem' }}>
         <h2 style={{ 
           marginBottom: '2rem', 
           textAlign: 'center', 
@@ -39,7 +44,8 @@ export default function LoginPage() {
         <Authenticator>
           <LoginRedirect />
         </Authenticator>
+        </div>
       </div>
-    </div>
+    </>
   );
 }
