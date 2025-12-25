@@ -18,6 +18,19 @@ export const metadata: Metadata = {
     description: 'Shorten links and generate QR codes instantly.',
     type: 'website',
   },
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "Qupeg",
+  },
+  formatDetection: {
+    telephone: false,
+  },
+};
+
+export const viewport = {
+  themeColor: "#0f766e",
 };
 
 export default function RootLayout({
