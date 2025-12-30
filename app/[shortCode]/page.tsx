@@ -72,11 +72,10 @@ export default async function ShortUrlRedirect({ params }: { params: Promise<{ s
     );
 
   } catch (err: any) {
-    console.error("Redirect Error:", err);
-    // If it's a redirect error (NEXT_REDIRECT), rethrow it as Next.js expects
-    if (err.digest?.startsWith('NEXT_REDIRECT')) {
+    if (err?.digest?.startsWith('NEXT_REDIRECT') || err?.message === 'NEXT_REDIRECT') {
         throw err;
     }
+    console.error("Redirect Error:", err);
     return <div>Error processing request</div>;
   }
 }
