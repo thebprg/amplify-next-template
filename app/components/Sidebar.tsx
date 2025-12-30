@@ -13,27 +13,10 @@ export default function Sidebar({ isOpen, onToggle }: { isOpen: boolean; onToggl
 
     <>
       {/* Floating Toggle Button - Always visible, Fixed position */}
+      <div className="mobile-top-banner" />
       <button 
           onClick={onToggle}
-          style={{ 
-              position: 'fixed',
-              top: '1.5rem',
-              left: '1.5rem',
-              zIndex: 200,
-              width: '44px',
-              height: '44px',
-              borderRadius: '12px',
-              background: 'transparent',
-              color: isOpen ? 'white' : 'var(--color-teal-900)',
-              border: 'none',
-              boxShadow: 'none',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '2rem', /* Increased size since box is gone */
-              cursor: 'pointer',
-              transition: 'all 0.3s ease'
-          }}
+          className={`sidebar-toggle ${isOpen ? 'open' : ''}`}
           title={isOpen ? "Collapse" : "Expand"}
           aria-label={isOpen ? "Close sidebar" : "Open sidebar"}
       >

@@ -21,7 +21,8 @@ import { validateUrl } from "./actions";
 Amplify.configure(outputs);
 
 const client = generateClient<Schema>();
-const authClient = generateClient<Schema>({ authMode: 'userPool' });
+// Removed dedicated authClient to prevent premature auth checks
+// We will use client.models.Group.observeQuery({ authMode: 'userPool' }) inline instead.
 
 const ITEMS_PER_PAGE = 10;
 
@@ -76,7 +77,7 @@ export default function App() {
       });
       
       // Observer Groups
-      const subGroups = authClient.models.Group.observeQuery({ authMode: 'userPool' }).subscribe({
+      const subGroups = client.models.Group.observeQuery({ authMode: 'userPool' }).subscribe({
         next: (data) => {
             const sorted = [...data.items].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
             setGroups(sorted);
@@ -184,10 +185,10 @@ export default function App() {
     }
     setCreatingGroup(true);
     try {
-        await authClient.models.Group.create({
+        await client.models.Group.create({
             name: newGroupName.trim(),
             description: newGroupDesc.trim() || undefined
-        });
+        }, { authMode: 'userPool' });
         showToast("Group Created", "success");
         setNewGroupName("");
         setNewGroupDesc("");
@@ -203,11 +204,12 @@ export default function App() {
     if (!confirm(`Delete group "${group.name}" and ALL its links? This cannot be undone.`)) return;
     
     try {
-        const { data: groupLinks } = await authClient.models.Url.list({
-            filter: { groupId: { eq: group.id } }
+        const { data: groupLinks } = await client.models.Url.list({
+            filter: { groupId: { eq: group.id } },
+            authMode: 'userPool'
         });
-        await Promise.all(groupLinks.map(link => client.models.Url.delete({ id: link.id }, { authMode: 'userPool' })));
-        await authClient.models.Group.delete({ id: group.id });
+        await Promise.all(groupLinks.map((link: any) => client.models.Url.delete({ id: link.id }, { authMode: 'userPool' })));
+        await client.models.Group.delete({ id: group.id }, { authMode: 'userPool' });
         
         showToast("Group and contents deleted", "success");
         if (viewingGroup?.id === group.id) setViewingGroup(null);
