@@ -72,9 +72,15 @@ export default async function ShortUrlRedirect({ params }: { params: Promise<{ s
     );
 
   } catch (err: any) {
-    if (err?.digest?.startsWith('NEXT_REDIRECT') || err?.message === 'NEXT_REDIRECT') {
+    const isRedirect = 
+        err?.digest?.startsWith?.('NEXT_REDIRECT') || 
+        err?.message === 'NEXT_REDIRECT' ||
+        (err && typeof err === 'object' && String(err).includes('NEXT_REDIRECT'));
+
+    if (isRedirect) {
         throw err;
     }
+    
     console.error("Redirect Error:", err);
     return <div>Error processing request</div>;
   }
