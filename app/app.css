@@ -138,6 +138,19 @@ h1, h2, h3, h4, button, input, label {
   align-items: stretch; /* Ensure equal height */
 }
 
+.dashboard-wrapper {
+  width: 100%;
+  padding: 0; 
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+}
+
+.app-shell.guest-mode .dashboard-wrapper {
+  padding: 2rem;
+}
+
 .card-section {
   padding: 2.5rem; /* Slightly reduced padding */
 }
@@ -366,6 +379,16 @@ h1, h2, h3, h4, button, input, label {
 
   .card-section {
     padding: 1.5rem; /* Reduced padding for more space */
+  }
+
+  /* Reset guest padding on mobile to match user */
+  .app-shell.guest-mode .dashboard-wrapper {
+    padding: 0; 
+  }
+
+  /* Ensure content area has padding on guest mobile too */
+  .app-shell.guest-mode .content-area {
+     padding: 5rem 0.5rem 2rem 0.5rem !important; /* Force override desktop reset */
   }
 }
 
