@@ -9,8 +9,8 @@ Amplify.configure(outputs);
 
 const client = generateClient<Schema>();
 
-export default async function ShortUrlRedirect({ params }: { params: { shortCode: string } }) {
-  const { shortCode } = params;
+export default async function ShortUrlRedirect({ params }: { params: Promise<{ shortCode: string }> }) {
+  const { shortCode } = await params;
 
   try {
     const { data: urls } = await client.models.Url.list({

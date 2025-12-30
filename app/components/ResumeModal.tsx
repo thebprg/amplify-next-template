@@ -1,13 +1,21 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import Image from 'next/image';
 
 export default function ResumeModal() {
   const [isOpen, setIsOpen] = useState(false);
 
   useEffect(() => {
-    const timer = setTimeout(() => setIsOpen(true), 1000);
-    return () => clearTimeout(timer);
+    // Check if already seen in this session
+    const hasSeen = sessionStorage.getItem('resume_modal_seen');
+    if (!hasSeen) {
+        const timer = setTimeout(() => {
+            setIsOpen(true);
+            sessionStorage.setItem('resume_modal_seen', 'true');
+        }, 1000);
+        return () => clearTimeout(timer);
+    }
   }, []);
 
   if (!isOpen) return null;
@@ -66,12 +74,12 @@ export default function ResumeModal() {
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
           
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '1.5rem', marginBottom: '1rem' }}>
-            <img 
+            <Image 
               src="/my_image.JPG" 
               alt="Profile"
+              width={160}
+              height={160}
               style={{ 
-                width: '160px', 
-                height: '160px', 
                 borderRadius: '50%', 
                 objectFit: 'cover',
                 objectPosition: 'top',
