@@ -16,7 +16,7 @@ import Toast, { ToastType } from "./components/Toast";
 import Sidebar from "./components/Sidebar";
 import GuestNavbar from "./components/GuestNavbar";
 import ResumeModal from "./components/ResumeModal";
-import { validateUrl } from "./actions";
+import { validateUrl, createGuestUrl } from "./actions";
 
 Amplify.configure(outputs);
 
@@ -109,12 +109,7 @@ export default function App() {
       return;
     }
 
-    if (customAlias && !/^[a-zA-Z0-9-]{4,15}$/.test(customAlias)) {
-      showToast("Alias must be 4-15 alphanumeric chars", "error");
-      return;
-    }
-
-    // Normalization & Validation
+    // Normalization
     let urlToShorten = originalUrl.trim();
     if (!/^https?:\/\//i.test(urlToShorten)) {
       urlToShorten = 'https://' + urlToShorten;
@@ -127,6 +122,31 @@ export default function App() {
 
     try {
       setIsLoading(true);
+
+      // GUEST PATH: Use server action (API key hidden, rate limited)
+      if (!user) {
+        const result = await createGuestUrl(urlToShorten);
+        
+        if (!result.success) {
+          showToast(result.error || "Failed to create link.", "error");
+          setIsLoading(false);
+          return;
+        }
+
+        setOriginalUrl("");
+        setShortenedUrl(result.url as any);
+        showToast("Link Generated!", "success");
+        setIsLoading(false);
+        return;
+      }
+
+      // AUTHENTICATED USER PATH: Direct GraphQL (protected by userPool auth)
+      if (customAlias && !/^[a-zA-Z0-9-]{4,15}$/.test(customAlias)) {
+        showToast("Alias must be 4-15 alphanumeric chars", "error");
+        setIsLoading(false);
+        return;
+      }
+
       const { isValid, error } = await validateUrl(urlToShorten);
       if (!isValid) {
         showToast(error || "URL unreachable.", "error");
@@ -135,7 +155,7 @@ export default function App() {
       }
 
       let finalShortCode = "";
-      if (user && customAlias) {
+      if (customAlias) {
         const { data: existing } = await client.models.Url.list({
           filter: { shortCode: { eq: customAlias } }
         });
@@ -149,11 +169,9 @@ export default function App() {
         finalShortCode = generateShortCode();
       }
 
-      const monthsToAdd = user ? expirationMonths : 3;
       const expirationDate = new Date();
-      expirationDate.setMonth(expirationDate.getMonth() + monthsToAdd);
+      expirationDate.setMonth(expirationDate.getMonth() + expirationMonths);
       const expirationTimestamp = Math.floor(expirationDate.getTime() / 1000);
-      const authMode = user ? 'userPool' : 'apiKey';
 
       const { data: newUrl } = await client.models.Url.create({
         originalUrl: urlToShorten,
@@ -162,7 +180,7 @@ export default function App() {
         expiration: expirationTimestamp,
         description: description.trim() || undefined,
         groupId: selectedGroupId || undefined
-      }, { authMode });
+      }, { authMode: 'userPool' });
 
       setOriginalUrl("");
       setCustomAlias("");
