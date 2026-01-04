@@ -21,7 +21,8 @@ import { validateUrl, createGuestUrl } from "./actions";
 Amplify.configure(outputs);
 
 const client = generateClient<Schema>();
-
+// Removed dedicated authClient to prevent premature auth checks
+// We will use client.models.Group.observeQuery({ authMode: 'userPool' }) inline instead.
 
 const ITEMS_PER_PAGE = 10;
 
