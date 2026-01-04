@@ -21,14 +21,15 @@ import { validateUrl, createGuestUrl } from "./actions";
 Amplify.configure(outputs);
 
 const client = generateClient<Schema>();
-// Removed dedicated authClient to prevent premature auth checks
-// We will use client.models.Group.observeQuery({ authMode: 'userPool' }) inline instead.
+
 
 const ITEMS_PER_PAGE = 10;
 
 export default function App() {
-  const { user } = useAuthenticator((context) => [context.user]);
+  const { user, authStatus } = useAuthenticator((context) => [context.user, context.authStatus]);
   const [urls, setUrls] = useState<Array<Schema["Url"]["type"]>>([]);
+
+
   const [groups, setGroups] = useState<Array<Schema["Group"]["type"]>>([]);
   
   // Link Form State
@@ -267,6 +268,23 @@ export default function App() {
 
   const totalGroupPages = Math.ceil(groups.length / ITEMS_PER_PAGE);
   const currentGroups = groups.slice((groupsPage - 1) * ITEMS_PER_PAGE, groupsPage * ITEMS_PER_PAGE);
+
+  // Prevent flash of guest content while checking auth
+  if (authStatus === 'configuring') {
+    return (
+      <div style={{ 
+        display: 'flex', 
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        height: '100vh', 
+        background: 'var(--bg-page)',
+        color: 'var(--color-teal-900)',
+        fontWeight: 600
+      }}>
+        Loading...
+      </div>
+    );
+  }
 
   return (
     <div className={`app-shell ${!user ? 'guest-mode' : ''} ${!isSidebarOpen ? 'sidebar-collapsed' : ''}`}>
@@ -752,10 +770,10 @@ function LinkCard({ url, group, domain, client, showToast, onDelete }: {
                     {/* Original URL */}
                     <div className="lc-original-url">
                         {isEditing ? (
-                            <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.25rem' }}>
-                                <input value={editValue} onChange={e => setEditValue(e.target.value)} className="input-base" style={{ padding: '4px 8px', fontSize: '0.8rem', width: '100%' }} />
-                                <button onClick={handleSaveOriginal} style={{ color: 'white', background: '#0f766e', border: 'none', borderRadius: '4px', padding: '0 8px', cursor: 'pointer' }}>Save</button>
-                                <button onClick={() => setIsEditing(false)} style={{ background: '#e2e8f0', border: 'none', borderRadius: '4px', padding: '0 8px', cursor: 'pointer' }}>X</button>
+                            <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.25rem', width: '100%' }}>
+                                <input value={editValue} onChange={e => setEditValue(e.target.value)} className="input-base" style={{ padding: '4px 8px', fontSize: '0.8rem', flex: 1, minWidth: 0 }} />
+                                <button onClick={handleSaveOriginal} style={{ color: 'white', background: '#0f766e', border: 'none', borderRadius: '4px', padding: '0 12px', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}>Save</button>
+                                <button onClick={() => setIsEditing(false)} style={{ background: '#e2e8f0', border: 'none', borderRadius: '4px', padding: '0 12px', cursor: 'pointer', flexShrink: 0 }}>X</button>
                             </div>
                         ) : (
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>

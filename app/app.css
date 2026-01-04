@@ -33,12 +33,18 @@
   box-sizing: border-box;
 }
 
+html {
+  overflow-x: hidden;
+}
+
 body {
   margin: 0;
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
   background-color: var(--bg-page);
   color: var(--color-slate-900);
   -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+  max-width: 100vw;
 }
 
 h1, h2, h3, h4, button, input, label {
@@ -94,6 +100,16 @@ h1, h2, h3, h4, button, input, label {
 .nav-item:hover {
   background: rgba(255,255,255,0.1);
   color: white;
+}
+
+/* Sidebar Header - Spacing for desktop toggle */
+.sidebar-header {
+  margin-top: 4rem; /* Clears the fixed toggle button on desktop */
+  margin-bottom: 2rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding-left: 0.5rem;
 }
 
 .nav-item.active {
@@ -163,6 +179,7 @@ h1, h2, h3, h4, button, input, label {
   flex: 1.5; 
   border-right: 1px solid var(--color-slate-100);
   background: white;
+  min-width: 0; /* Prevent flex overflow */
 }
 
 .card-right {
@@ -175,6 +192,7 @@ h1, h2, h3, h4, button, input, label {
   text-align: center;
   position: relative;
   border-left: 1px solid rgba(0,0,0,0.04);
+  min-width: 0; /* Prevent flex overflow */
 }
 
 /* Typography */
@@ -321,68 +339,161 @@ h1, h2, h3, h4, button, input, label {
   display: none;
 }
 
-@media (max-width: 768px) {
-  /* Mobile Top Banner with Hamburger Top Right */
+/* TABLET & MOBILE: Premium responsive layout at 1024px and below */
+@media (max-width: 1024px) {
+  /* Premium Top Banner - Teal gradient header */
   .mobile-top-banner {
-    display: block;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
     position: fixed;
     top: 0;
     left: 0;
     width: 100%;
-    height: 60px;
-    background: var(--bg-page);
+    height: 56px;
+    background: linear-gradient(135deg, var(--color-teal-900) 0%, var(--color-teal-700) 100%);
     z-index: 150;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.05); /* Subtle border effect */
+    box-shadow: 0 2px 12px rgba(15, 118, 110, 0.3);
+    padding: 0 1rem;
   }
 
+  /* Hamburger toggle - positioned on right side of banner */
   .sidebar-toggle {
-    top: 0.5rem;
+    position: fixed;
+    top: 8px;
     right: 1rem;
-    left: auto; /* Reset left */
+    left: auto;
+    z-index: 300;
+    width: 40px;
+    height: 40px;
+    background: transparent;
+    border-radius: 8px;
+    color: white;
+    font-size: 1.75rem;
+    transition: all 0.2s ease;
   }
 
-  /* Keep toggle dark on mobile even when open since banner is white */
+  .sidebar-toggle:hover {
+    background: rgba(255, 255, 255, 0.1);
+  }
+
   .sidebar-toggle.open {
-    color: var(--color-teal-900);
+    background: transparent;
+    color: white;
   }
 
-  /* Sidebar now slides from Top */
+  /* Slide-down Menu - Dark Teal Theme */
   .sidebar-panel {
-    width: 95%;
-    max-width: 95%;
-    height: 75vh;
-    left: 50%;
-    top: 0;
+    width: 100%;
+    max-width: 100%;
+    height: auto;
+    min-height: 40vh; /* Ensure it has substantial presence */
+    max-height: calc(100vh - 56px); /* Let it fill the screen */
+    left: 0;
+    top: 56px; /* Directly below banner */
     border-radius: 0 0 24px 24px;
-    transform: translate(-50%, -110%); /* Start above viewport */
-    transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-    box-shadow: 0 20px 50px rgba(0,0,0,0.2);
+    background: var(--color-teal-900); /* Dark teal background */
+    transform: translateY(-120%);
+    transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+    z-index: 140;
+    overflow-y: auto;
+    padding: 1rem 1rem 2rem 1rem;
+    opacity: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+  }
+
+  /* Reset margin for header since it starts below banner */
+  .sidebar-header {
+    margin-top: 0;
+    margin-bottom: 1rem;
+    padding-left: 0;
+  }
+
+  /* Compact spacing for nav items */
+  .sidebar-panel .nav-item {
+    margin-bottom: 0.25rem;
   }
 
   .sidebar-panel.open {
-    transform: translate(-50%, 0);
+    transform: translateY(0);
+    opacity: 1;
   }
   
   .sidebar-panel.closed {
-    transform: translate(-50%, -110%);
+    transform: translateY(-120%);
+    opacity: 0;
   }
 
-  /* Content Area - Minimal Margins */
+  /* Nav items inside slide-down - Dark Theme Styling */
+  .sidebar-panel .nav-item {
+    background: transparent;
+    border-radius: 12px;
+    margin-bottom: 0.5rem;
+    padding: 0.875rem 1.25rem;
+    font-size: 1rem;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.85); /* Off-white text */
+    transition: all 0.2s ease;
+    border: 1px solid transparent;
+  }
+
+  .sidebar-panel .nav-item:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+    transform: translateX(4px);
+  }
+
+  .sidebar-panel .nav-item.active {
+    background: var(--color-teal-700); /* Slightly lighter teal for active */
+    color: white;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  }
+
+  /* User info section at bottom */
+  .sidebar-panel .sidebar-footer {
+    margin-top: 1.5rem;
+    padding-top: 1rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  /* Content Area - Full width, proper spacing */
   .content-area {
     margin-left: 0 !important;
-    padding-top: 5rem; /* Clear banner */
-    padding-left: 0.5rem;
-    padding-right: 0.5rem;
+    padding-top: 4.5rem;
+    padding-left: 1rem;
+    padding-right: 1rem;
     padding-bottom: 2rem;
   }
   
-  /* Expand Cards */
+  /* Cards stack vertically */
   .main-card {
-    border-radius: 16px; /* Slightly smaller radius on mobile */
+    flex-direction: column;
+    border-radius: 16px;
+  }
+
+  .card-left {
+    border-right: none;
+    border-bottom: 1px solid var(--color-slate-100);
   }
 
   .card-section {
-    padding: 1.5rem; /* Reduced padding for more space */
+    padding: 1.5rem;
+  }
+}
+
+/* PHONE SPECIFIC: Even tighter spacing */
+@media (max-width: 480px) {
+  .content-area {
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+  }
+
+  .card-section {
+    padding: 1rem;
   }
 }
 
@@ -416,11 +527,13 @@ h1, h2, h3, h4, button, input, label {
     font-size: 1.5rem; /* Increased from 1.2rem */
     text-decoration: none;
     line-height: 1.2;
+    word-break: break-all; /* Prevent long links from overflowing */
 }
 
 .lc-original-url {
     font-size: 1rem; /* Increased from 0.8rem */
     color: #64748b;
+    word-break: break-all; /* Prevent long URLs from overflowing */
 }
 
 .lc-section-middle {
