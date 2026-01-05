@@ -8,6 +8,7 @@ specifies that any user authenticated via an API key can "create", "read",
 =========================================================================*/
 
 import { incrementClicks } from "../functions/increment-clicks/resource";
+import { createGuestUrl } from "../functions/create-guest-url/resource";
 
 const schema = a.schema({
   Url: a
@@ -23,7 +24,10 @@ const schema = a.schema({
       group: a.belongsTo('Group', 'groupId'),
     })
     .secondaryIndexes((index) => [index("shortCode")])
-    .authorization(allow => [allow.owner(), allow.publicApiKey().to(['read', 'create'])]),
+    .authorization(allow => [
+      allow.owner(), 
+      allow.publicApiKey().to(['read']) // Removed 'create' permission for public API key
+    ]),
 
   Group: a
     .model({
@@ -38,6 +42,18 @@ const schema = a.schema({
     .arguments({ urlId: a.id() })
     .returns(a.integer())
     .handler(a.handler.function(incrementClicks))
+    .authorization(allow => [allow.publicApiKey()]),
+
+  createGuestUrl: a
+    .mutation()
+    .arguments({ originalUrl: a.string().required() })
+    .returns(a.customType({
+      id: a.id().required(),
+      shortCode: a.string().required(),
+      originalUrl: a.string().required(),
+      expiration: a.timestamp(),
+    }))
+    .handler(a.handler.function(createGuestUrl))
     .authorization(allow => [allow.publicApiKey()]),
 });
 

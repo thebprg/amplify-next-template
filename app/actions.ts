@@ -131,12 +131,9 @@ export async function createGuestUrl(originalUrl: string): Promise<{
     expirationDate.setMonth(expirationDate.getMonth() + 3);
     const expirationTimestamp = Math.floor(expirationDate.getTime() / 1000);
 
-    // Create URL via Amplify (server-side, API key hidden)
-    const { data: newUrl, errors } = await client.models.Url.create({
-      originalUrl: urlToShorten,
-      shortCode,
-      clicks: 0,
-      expiration: expirationTimestamp,
+    // Create URL via Amplify Custom Mutation (server-side, API key authorized but restricted to this mutation)
+    const { data: newUrl, errors } = await client.mutations.createGuestUrl({
+      originalUrl: urlToShorten
     }, { authMode: 'apiKey' });
 
     if (errors || !newUrl) {
@@ -150,11 +147,11 @@ export async function createGuestUrl(originalUrl: string): Promise<{
         id: newUrl.id,
         shortCode: newUrl.shortCode,
         originalUrl: newUrl.originalUrl,
-        expiration: newUrl.expiration || expirationTimestamp,
+        expiration: newUrl.expiration ? newUrl.expiration : expirationTimestamp, // Use returned expiration or calculated fallback
       }
     };
   } catch (error: any) {
-    console.error("Create Guest URL Error:", error);
-    return { success: false, error: "An unexpected error occurred." };
+    console.error("Create Guest URL Error Extended:", JSON.stringify(error, null, 2));
+    return { success: false, error: "System Error: " + (error.message || "Unknown") };
   }
 }
