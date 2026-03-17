@@ -13,12 +13,9 @@ export default async function ShortUrlRedirect({ params }: { params: Promise<{ s
   const { shortCode } = await params;
 
   try {
-    const { data: urls } = await client.models.Url.list({
-      filter: {
-        shortCode: {
-          eq: shortCode
-        }
-      },
+    const { data: urls } = await client.models.Url.listUrlByShortCode({
+      shortCode: shortCode
+    }, {
       authMode: 'apiKey' 
     });
 
