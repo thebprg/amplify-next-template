@@ -24,63 +24,7 @@ export default function GuestNavbar() {
       <div style={{ display: 'flex', alignItems: 'center', gap: '2.5rem' }}>
 
         
-        <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center' }}>
-            <Link href="/about" style={{ textDecoration: 'none', color: 'var(--color-slate-600)', fontWeight: 500, fontSize: '0.95rem' }}>
-                About
-            </Link>
-
-            {/* Products Dropdown */}
-            <div 
-                style={{ position: 'relative', cursor: 'pointer' }}
-                onMouseEnter={() => setIsDropdownOpen(true)}
-                onMouseLeave={() => setIsDropdownOpen(false)}
-            >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', color: 'var(--color-slate-600)', fontWeight: 500, fontSize: '0.95rem' }}>
-                    Products
-                    <svg width="10" height="6" viewBox="0 0 10 6" fill="none" style={{ transform: isDropdownOpen ? 'rotate(180deg)' : 'rotate(0)', transition: 'transform 0.2s' }}>
-                        <path d="M1 1L5 5L9 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                </div>
-
-                {isDropdownOpen && (
-                    <div style={{
-                        position: 'absolute',
-                        top: '100%',
-                        left: -10,
-                        background: 'white',
-                        border: '1px solid var(--color-slate-100)',
-                        boxShadow: 'var(--shadow-layered)',
-                        borderRadius: '12px',
-                        padding: '0.5rem',
-                        minWidth: '220px',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        zIndex: 100
-                    }}>
-                        <Link href="/" className="dropdown-item active">
-                            <div style={{ fontWeight: 600 }}>URL Shortener</div>
-                            <div style={{ fontSize: '0.75rem', opacity: 0.7 }}>Shorten & Track Links</div>
-                        </Link>
-                        <div className="dropdown-item disabled">
-                            <div style={{ fontWeight: 600 }}>Poster Generator</div>
-                            <div style={{ fontSize: '0.75rem', opacity: 0.7 }}>Coming Soon</div>
-                        </div>
-                        <div className="dropdown-item disabled">
-                            <div style={{ fontWeight: 600 }}>Bill & Mail Manager</div>
-                            <div style={{ fontSize: '0.75rem', opacity: 0.7 }}>Coming Soon</div>
-                        </div>
-                         <div className="dropdown-item disabled">
-                            <div style={{ fontWeight: 600 }}>Web Pages</div>
-                            <div style={{ fontSize: '0.75rem', opacity: 0.7 }}>Coming Soon</div>
-                        </div>
-                    </div>
-                )}
-            </div>
-
-            <Link href="/pricing" style={{ textDecoration: 'none', color: 'var(--color-slate-600)', fontWeight: 500, fontSize: '0.95rem' }}>
-                Pricing
-            </Link>
-        </div>
+        {/* Removed About, Products, and Pricing links per user request */}
       </div>
 
       {/* RIGHT: Login */}

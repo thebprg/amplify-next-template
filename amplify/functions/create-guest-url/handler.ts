@@ -1,6 +1,6 @@
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { DynamoDBDocumentClient, PutCommand } from "@aws-sdk/lib-dynamodb";
-import { randomBytes } from "crypto";
+import { randomBytes, randomUUID } from "crypto";
 
 const client = new DynamoDBClient({});
 const docClient = DynamoDBDocumentClient.from(client);
@@ -55,7 +55,7 @@ export const handler = async (event: any) => {
   // Note: We are bypassing the AppSync "createdAt/updatedAt" auto-generation 
   // so we must populate them if the schema expects them (Amplify Gen 2 does).
   const item = {
-    id: crypto.randomUUID(), 
+    id: randomUUID(), 
     shortCode,
     originalUrl: urlToShorten,
     clicks: 0,
